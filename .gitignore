@@ -1,0 +1,16 @@
+# Custom
+*.local.conf
+
+out
+gen
+
+/build
+.gradle
+
+# IDEs and editors
+/.idea
+*iml
+.project
+.classpath
+*.launch
+.settings/
