@@ -3,6 +3,8 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 val ktor_version: String by project
 val kodein_version: String by project
 val logback_version: String by project
+val kotest_version: String by project
+val mockk_version: String by project
 
 plugins {
     kotlin("jvm") version "1.4.10"
@@ -19,6 +21,13 @@ repositories {
 }
 
 dependencies {
+    testImplementation("io.kotest:kotest-runner-junit5:$kotest_version") // for kotest framework
+    testImplementation("io.kotest:kotest-assertions-core:$kotest_version") // for kotest core jvm assertions
+    testImplementation("io.kotest:kotest-property:$kotest_version") // for kotest property test
+    testImplementation("io.kotest:kotest-assertions-ktor:$kotest_version") // for kotest property test
+    testImplementation("io.ktor:ktor-server-test-host:$ktor_version")
+    testImplementation("io.mockk:mockk:$mockk_version")
+
     implementation("io.ktor:ktor-server-netty:$ktor_version")
     implementation("io.ktor:ktor-html-builder:$ktor_version")
     implementation("io.ktor:ktor-serialization:$ktor_version")
@@ -34,6 +43,9 @@ dependencies {
 
 tasks.withType<KotlinCompile>() {
     kotlinOptions.jvmTarget = "1.8"
+}
+tasks.withType<Test> {
+    useJUnitPlatform()
 }
 
 application {

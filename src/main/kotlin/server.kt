@@ -2,7 +2,6 @@ import com.mongodb.ConnectionString
 import com.mongodb.MongoClientSettings
 import com.mongodb.MongoCredential
 import com.mongodb.WriteConcern
-import com.typesafe.config.ConfigFactory
 import io.ktor.application.*
 import io.ktor.auth.*
 import io.ktor.auth.jwt.*
@@ -22,15 +21,16 @@ import org.litote.kmongo.coroutine.coroutine
 import org.litote.kmongo.reactivestreams.KMongo
 import routes.routes
 import security.JwtConfig
-import service.FormService
-import service.UserService
+import app.FormService
+import app.MongoUserService
+import app.UserService
+import org.kodein.di.DI
+import org.kodein.di.ktor.DIFeature
 import kotlin.text.toCharArray
 
 
 @KtorExperimentalAPI
-fun initDatabase(): CoroutineDatabase {
-    val config = HoconApplicationConfig(ConfigFactory.load("application.local.conf"))
-
+fun initDatabase(config: ApplicationConfig): CoroutineDatabase {
     val mongoClientSettings = MongoClientSettings.builder()
         .applyConnectionString(ConnectionString(config.property("mongodb.connectionstring").getString()))
         .credential(
@@ -49,24 +49,32 @@ fun initDatabase(): CoroutineDatabase {
     return client.getDatabase(config.property("mongodb.database").getString()) //normal java driver usage
 }
 
+
 @ExperimentalSerializationApi
 @KtorExperimentalAPI
 @SuppressWarnings("unused") // used in application.conf
 fun Application.main() {
     di {
-        bind<CoroutineDatabase>() with singleton { initDatabase() }
-        bind<UserService>() with singleton { UserService(instance()) }
+        bind<CoroutineDatabase>() with singleton { initDatabase(environment.config) }
+        bind<UserService>() with singleton { MongoUserService(instance()) }
         bind<FormService>() with singleton { FormService(instance()) }
+        bind<JwtConfig>() with singleton { JwtConfig(environment.config) }
     }
-    
-    val userService by di().instance<UserService>()
 
     install(Authentication) {
+        val userService by di().instance<UserService>()
+        val jwtConfig by di().instance<JwtConfig>()
+        val jwtAudience = environment.config.property("jwt.audience").getString()
+        val jwtRealm = environment.config.property("jwt.realm").getString()
+
         jwt {
-            verifier(JwtConfig.verifier)
-            realm = "postithere"
+            realm = jwtRealm
+            verifier(jwtConfig.verifier)
             validate {
-                it.payload.getClaim("id").asString()?.let { id -> userService.getUserById(id) }
+                if (it.payload.audience.contains(jwtAudience))
+                    it.payload.subject.let { id -> userService.getUserById(id) }
+                else
+                    null
             }
         }
     }
