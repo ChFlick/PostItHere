@@ -1,4 +1,4 @@
-package service
+package app
 
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer

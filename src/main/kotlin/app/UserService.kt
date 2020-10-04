@@ -1,8 +1,7 @@
-package service
+package app
 
 import com.mongodb.WriteConcern
 import io.ktor.auth.*
-import kotlinx.html.InputType
 import kotlinx.serialization.*
 import org.bson.types.ObjectId
 import org.litote.kmongo.Id
@@ -31,14 +30,26 @@ data class User(
 @Serializable
 data class EmailPasswordCredential (val email: String, val password: String) : Credential
 
-class UserService(database: CoroutineDatabase) {
+interface UserService {
+    suspend fun getUserByEmail(email: String): User?
+
+    suspend fun addUser(user: User): Boolean
+
+    suspend fun addFormToUser(user: User, formId: String): Boolean
+
+    suspend fun getUserById(userId: String): User?
+
+    suspend fun getUserByCredentials(credential: EmailPasswordCredential): User?
+}
+
+class MongoUserService(database: CoroutineDatabase) : UserService {
     private val userCollection = database.getCollection<User>("users").withWriteConcern(WriteConcern.MAJORITY)
 
-    suspend fun getUserByEmail(email: String): User? {
+    override suspend fun getUserByEmail(email: String): User? {
         return userCollection.findOne(User::email eq email)
     }
 
-    suspend fun addUser(user: User): Boolean {
+    override suspend fun addUser(user: User): Boolean {
         val userWithHashedPassword = User(
             user.id,
             user.email,
@@ -50,18 +61,18 @@ class UserService(database: CoroutineDatabase) {
         return userCollection.insertOne(userWithHashedPassword).wasAcknowledged()
     }
 
-    suspend fun addFormToUser(user: User, formId: String): Boolean {
+    override suspend fun addFormToUser(user: User, formId: String): Boolean {
         return userCollection.updateOne(
             User::email eq user.email,
             addToSet(User::formIds, formId)
         ).modifiedCount == 1L
     }
 
-    suspend fun getUserById(userId: String): User? {
+    override suspend fun getUserById(userId: String): User? {
         return userCollection.findOneById(ObjectId(userId))
     }
 
-    suspend fun getUserByCredentials(credential: EmailPasswordCredential): User? {
+    override suspend fun getUserByCredentials(credential: EmailPasswordCredential): User? {
         val user = userCollection.findOne(User::email eq credential.email) ?: return null
         return if (BCrypt.checkpw(credential.password, user.password)) user else null
     }

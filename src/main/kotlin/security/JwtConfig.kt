@@ -5,30 +5,31 @@ import com.auth0.jwt.algorithms.*
 import com.typesafe.config.ConfigFactory
 import io.ktor.config.*
 import io.ktor.util.*
-import service.User
+import app.User
 import java.util.*
 
+private const val validityInMs = 36_000_00 * 10 // 10 hours
+
 @KtorExperimentalAPI
-object JwtConfig {
-    private val secret = HoconApplicationConfig(ConfigFactory.load("application.local.conf"))
-        .property("security.jwt.secret")
-        .getString()
-    private const val issuer = "postithere.com"
-    private const val validityInMs = 36_000_00 * 10 // 10 hours
+class JwtConfig(private val config: ApplicationConfig) {
+    private val secret = config.property("jwt.secret").getString()
+    private val issuer = config.property("jwt.issuer").getString()
+    private val audience = config.property("jwt.audience").getString()
     private val algorithm = Algorithm.HMAC512(secret)
 
     val verifier: JWTVerifier = JWT
         .require(algorithm)
         .withIssuer(issuer)
+        .withAudience(audience)
         .build()
 
     /**
      * Produce a token for this combination of User and Account
      */
     fun makeToken(user: User): String = JWT.create()
-        .withSubject("Authentication")
+        .withSubject(user.id.toString())
         .withIssuer(issuer)
-        .withClaim("id", user.id.toString())
+        .withAudience(audience)
         .withExpiresAt(getExpiration())
         .sign(algorithm)
 
