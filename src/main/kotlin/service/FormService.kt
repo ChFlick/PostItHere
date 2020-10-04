@@ -28,6 +28,7 @@ object InstantSerializer : KSerializer<ZonedDateTime> {
     }
 }
 
+@ExperimentalSerializationApi
 @Serializable
 data class Form(
     val formId: String,
@@ -38,12 +39,15 @@ data class Form(
 )
 
 class FormService(database: CoroutineDatabase) {
-    private val requestCollection = database.getCollection<Form>()
+    @ExperimentalSerializationApi
+    private val requestCollection = database.getCollection<Form>("forms")
 
+    @ExperimentalSerializationApi
     suspend fun getFormsByFormId(formId: String): List<Form> {
         return requestCollection.find(Form::formId eq formId).toList()
     }
 
+    @ExperimentalSerializationApi
     suspend fun insertRequest(form: Form): Boolean {
         return requestCollection.insertOne(form).wasAcknowledged()
     }
