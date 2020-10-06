@@ -140,4 +140,89 @@ class UsersControllerKtTest : StringSpec({
             req.response shouldHaveStatus HttpStatusCode.ServiceUnavailable
         }
     }
+
+    "Registration should be denied with duplicate email config" {
+        withServer {
+            val database by di { application }.instance<CoroutineDatabase>()
+            val configColl = database.getCollection<BooleanConfig>("config")
+            val userColl = database.getCollection<User>("users")
+
+            runBlocking {
+                configColl.updateOne(
+                    BooleanConfig::key eq "allowRegistration",
+                    setValue(BooleanConfig::value, true),
+                    UpdateOptions().upsert(true)
+                )
+
+                userColl.insertOne(
+                    User(
+                        email = testUser.email,
+                        password = testUser.password
+                    )
+                )
+            }
+
+            val req = handleRequest {
+                uri = "/users/register"
+                method = HttpMethod.Post
+                addHeader("Content-Type", "application/json")
+                setBody(Json.encodeToString(EmailPasswordCredential(testUser.email, testUser.password)))
+            }
+
+            req.requestHandled shouldBe true
+            req.response shouldHaveStatus HttpStatusCode.NotModified
+        }
+    }
+
+    "Registration should fail with only email" {
+        withServer {
+            val database by di { application }.instance<CoroutineDatabase>()
+            val configColl = database.getCollection<BooleanConfig>("config")
+
+            runBlocking {
+                configColl.updateOne(
+                    BooleanConfig::key eq "allowRegistration",
+                    setValue(BooleanConfig::value, true),
+                    UpdateOptions().upsert(true)
+                )
+            }
+
+            val req = handleRequest {
+                uri = "/users/register"
+                method = HttpMethod.Post
+                addHeader("Content-Type", "application/json")
+                setBody("""{"email": "email@example.com"}""")
+            }
+
+            req.requestHandled shouldBe true
+            req.response shouldHaveStatus HttpStatusCode.BadRequest
+            req.response.content shouldBe "Field 'password' is required, but it was missing"
+        }
+    }
+
+    "Registration should fail with only password" {
+        withServer {
+            val database by di { application }.instance<CoroutineDatabase>()
+            val configColl = database.getCollection<BooleanConfig>("config")
+
+            runBlocking {
+                configColl.updateOne(
+                    BooleanConfig::key eq "allowRegistration",
+                    setValue(BooleanConfig::value, true),
+                    UpdateOptions().upsert(true)
+                )
+            }
+
+            val req = handleRequest {
+                uri = "/users/register"
+                method = HttpMethod.Post
+                addHeader("Content-Type", "application/json")
+                setBody("""{"password": "asdf"}""")
+            }
+
+            req.requestHandled shouldBe true
+            req.response shouldHaveStatus HttpStatusCode.BadRequest
+            req.response.content shouldBe "Field 'email' is required, but it was missing"
+        }
+    }
 })

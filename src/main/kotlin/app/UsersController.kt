@@ -58,7 +58,7 @@ private suspend fun PipelineContext<Unit, ApplicationCall>.register(userService:
             userService.addUser(user)
             call.respond(HttpStatusCode.Created)
         } catch (e: MongoWriteException) {
-            if (e.error.category.equals(ErrorCategory.DUPLICATE_KEY)) {
+            if (e.error.category == ErrorCategory.DUPLICATE_KEY) {
                 call.respond(HttpStatusCode.NotModified)
             } else {
                 call.respond(HttpStatusCode.InternalServerError)

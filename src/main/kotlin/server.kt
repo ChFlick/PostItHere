@@ -25,6 +25,8 @@ import app.FormService
 import app.MongoUserService
 import app.UserService
 import com.configcat.ConfigCatClient
+import io.ktor.response.*
+import kotlinx.serialization.SerializationException
 import org.kodein.di.DI
 import org.kodein.di.ktor.DIFeature
 import kotlin.text.toCharArray
@@ -61,7 +63,11 @@ fun Application.main() {
         bind<UserService>() with singleton { MongoUserService(instance()) }
         bind<FormService>() with singleton { FormService(instance()) }
         bind<JwtConfig>() with singleton { JwtConfig(environment.config) }
-        bind<ConfigCatClient>() with singleton { ConfigCatClient(environment.config.property("configcat.apikey").getString()) }
+        bind<ConfigCatClient>() with singleton {
+            ConfigCatClient(
+                environment.config.property("configcat.apikey").getString()
+            )
+        }
     }
 
     install(Authentication) {
@@ -100,6 +106,13 @@ fun Application.main() {
         allowCredentials = true
         anyHost()
         maxAgeInSeconds = 86400L
+    }
+
+    install(StatusPages) {
+        exception<SerializationException> { cause ->
+            cause.message?.let { call.respond(HttpStatusCode.BadRequest, it) }
+                ?: call.respond(HttpStatusCode.BadRequest)
+        }
     }
 
     install(DefaultHeaders)
