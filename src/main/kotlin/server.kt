@@ -57,6 +57,7 @@ fun initDatabase(config: ApplicationConfig): CoroutineDatabase {
 fun Application.main() {
     di {
         bind<CoroutineDatabase>() with singleton { initDatabase(environment.config) }
+        bind<ConfigStore>() with singleton { ConfigStore(instance()) }
         bind<UserService>() with singleton { MongoUserService(instance()) }
         bind<FormService>() with singleton { FormService(instance()) }
         bind<JwtConfig>() with singleton { JwtConfig(environment.config) }

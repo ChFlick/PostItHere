@@ -1,5 +1,6 @@
 package app
 
+import ConfigStore
 import com.configcat.ConfigCatClient
 import com.mongodb.DuplicateKeyException
 import com.mongodb.ErrorCategory
@@ -16,14 +17,14 @@ import security.JwtConfig
 
 fun Routing.users() {
     val userService by di().instance<UserService>()
-    val config by di().instance<ConfigCatClient>()
+    val config by di().instance<ConfigStore>()
 
     route("users") {
         post("login") { login(userService) }
         route("register") {
             intercept(ApplicationCallPipeline.Features) {
-                config.getValue(Boolean::class.java, "allowRegistration", false)
-                    .takeIf { it }
+                config.getValue("allowRegistration", false)
+                    .takeIf { !it }
                     ?.apply {
                         call.respond(HttpStatusCode.ServiceUnavailable)
                         finish()
