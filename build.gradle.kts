@@ -39,6 +39,7 @@ dependencies {
     implementation("org.kodein.di:kodein-di:$kodein_version")
     implementation("org.kodein.di:kodein-di-framework-ktor-server-jvm:$kodein_version")
     implementation("org.mindrot:jbcrypt:0.4")
+    implementation("com.configcat:configcat-android-client:5.+")
 }
 
 tasks.withType<KotlinCompile>() {

@@ -1,7 +1,9 @@
 package app
 
+import BooleanConfig
 import com.mongodb.WriteConcern
 import io.ktor.auth.*
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.*
 import org.bson.types.ObjectId
 import org.litote.kmongo.Id
@@ -28,7 +30,7 @@ data class User(
 ) : Principal
 
 @Serializable
-data class EmailPasswordCredential (val email: String, val password: String) : Credential
+data class EmailPasswordCredential(val email: String, val password: String) : Credential
 
 interface UserService {
     suspend fun getUserByEmail(email: String): User?
@@ -44,6 +46,12 @@ interface UserService {
 
 class MongoUserService(database: CoroutineDatabase) : UserService {
     private val userCollection = database.getCollection<User>("users").withWriteConcern(WriteConcern.MAJORITY)
+
+    init {
+        runBlocking {
+            userCollection.ensureUniqueIndex(User::email)
+        }
+    }
 
     override suspend fun getUserByEmail(email: String): User? {
         return userCollection.findOne(User::email eq email)
