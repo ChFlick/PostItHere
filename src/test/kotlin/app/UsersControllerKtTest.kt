@@ -1,5 +1,7 @@
 package app
 
+import BooleanConfig
+import com.mongodb.client.model.UpdateOptions
 import io.kotest.assertions.ktor.shouldHaveStatus
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.nulls.shouldBeNull
@@ -15,6 +17,8 @@ import org.kodein.di.instance
 import org.kodein.di.ktor.di
 import org.litote.kmongo.coroutine.CoroutineDatabase
 import org.litote.kmongo.eq
+import org.litote.kmongo.set
+import org.litote.kmongo.setValue
 import org.mindrot.jbcrypt.BCrypt
 import testUser
 import withServer
@@ -25,7 +29,7 @@ class UsersControllerKtTest : StringSpec({
             val database by di { application }.instance<CoroutineDatabase>()
             val userColl = database.getCollection<User>("users")
             runBlocking {
-                userColl.deleteOne(User::email eq testUser.email)
+                userColl.deleteMany()
             }
         }
     }
@@ -86,6 +90,54 @@ class UsersControllerKtTest : StringSpec({
                 it.shouldNotBeNull()
                 it.shouldNotBeBlank()
             }
+        }
+    }
+
+    "Registration should succeed with valid data" {
+        withServer {
+            val database by di { application }.instance<CoroutineDatabase>()
+            val configColl = database.getCollection<BooleanConfig>("config")
+            runBlocking {
+                configColl.updateOne(
+                    BooleanConfig::key eq "allowRegistration",
+                    setValue(BooleanConfig::value, true),
+                    UpdateOptions().upsert(true)
+                )
+            }
+
+            val req = handleRequest {
+                uri = "/users/register"
+                method = HttpMethod.Post
+                addHeader("Content-Type", "application/json")
+                setBody(Json.encodeToString(EmailPasswordCredential(testUser.email, testUser.password)))
+            }
+
+            req.requestHandled shouldBe true
+            req.response shouldHaveStatus HttpStatusCode.Created
+        }
+    }
+
+    "Registration should be denied with deactivated config" {
+        withServer {
+            val database by di { application }.instance<CoroutineDatabase>()
+            val configColl = database.getCollection<BooleanConfig>("config")
+            runBlocking {
+                configColl.updateOne(
+                    BooleanConfig::key eq "allowRegistration",
+                    setValue(BooleanConfig::value, false),
+                    UpdateOptions().upsert(true)
+                )
+            }
+
+            val req = handleRequest {
+                uri = "/users/register"
+                method = HttpMethod.Post
+                addHeader("Content-Type", "application/json")
+                setBody(Json.encodeToString(EmailPasswordCredential(testUser.email, testUser.password)))
+            }
+
+            req.requestHandled shouldBe true
+            req.response shouldHaveStatus HttpStatusCode.ServiceUnavailable
         }
     }
 })
