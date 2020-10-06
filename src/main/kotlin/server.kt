@@ -24,6 +24,7 @@ import security.JwtConfig
 import app.FormService
 import app.MongoUserService
 import app.UserService
+import com.configcat.ConfigCatClient
 import org.kodein.di.DI
 import org.kodein.di.ktor.DIFeature
 import kotlin.text.toCharArray
@@ -59,6 +60,7 @@ fun Application.main() {
         bind<UserService>() with singleton { MongoUserService(instance()) }
         bind<FormService>() with singleton { FormService(instance()) }
         bind<JwtConfig>() with singleton { JwtConfig(environment.config) }
+        bind<ConfigCatClient>() with singleton { ConfigCatClient(environment.config.property("configcat.apikey").getString()) }
     }
 
     install(Authentication) {

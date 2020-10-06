@@ -1,5 +1,9 @@
 package app
 
+import com.configcat.ConfigCatClient
+import com.mongodb.DuplicateKeyException
+import com.mongodb.ErrorCategory
+import com.mongodb.MongoWriteException
 import io.ktor.application.*
 import io.ktor.http.*
 import io.ktor.request.*
@@ -12,10 +16,22 @@ import security.JwtConfig
 
 fun Routing.users() {
     val userService by di().instance<UserService>()
+    val config by di().instance<ConfigCatClient>()
 
     route("users") {
         post("login") { login(userService) }
-        post("register") { register(userService) }
+        route("register") {
+            intercept(ApplicationCallPipeline.Features) {
+                config.getValue(Boolean::class.java, "allowRegistration", false)
+                    .takeIf { it }
+                    ?.apply {
+                        call.respond(HttpStatusCode.ServiceUnavailable)
+                        finish()
+                    }
+            }
+
+            post { register(userService) }
+        }
     }
 }
 
@@ -36,8 +52,17 @@ private suspend fun PipelineContext<Unit, ApplicationCall>.login(userService: Us
 private suspend fun PipelineContext<Unit, ApplicationCall>.register(userService: UserService) {
     val user = call.receiveOrNull(User::class)
 
-    if (user != null && userService.addUser(user)) {
-        call.respond(HttpStatusCode.OK)
+    if (user != null) {
+        try {
+            userService.addUser(user)
+            call.respond(HttpStatusCode.Created)
+        } catch (e: MongoWriteException) {
+            if (e.error.category.equals(ErrorCategory.DUPLICATE_KEY)) {
+                call.respond(HttpStatusCode.NotModified)
+            } else {
+                call.respond(HttpStatusCode.InternalServerError)
+            }
+        }
     } else {
         call.respond(HttpStatusCode.InternalServerError)
     }
