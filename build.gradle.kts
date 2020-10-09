@@ -9,6 +9,7 @@ val mockk_version: String by project
 plugins {
     kotlin("jvm") version "1.4.10"
     kotlin("plugin.serialization") version "1.4.10"
+    id("com.adarshr.test-logger") version "2.1.0"
     application
 }
 
