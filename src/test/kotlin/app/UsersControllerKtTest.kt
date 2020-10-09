@@ -1,8 +1,8 @@
 package app
 
-import BooleanConfig
-import com.mongodb.client.model.UpdateOptions
+import ConfigStore
 import DatabaseStringSpec
+import TestDbContainer
 import io.kotest.assertions.ktor.shouldHaveStatus
 import io.kotest.core.test.TestCase
 import io.kotest.matchers.nulls.shouldBeNull
@@ -11,7 +11,11 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldNotBeBlank
 import io.ktor.http.*
 import io.ktor.server.testing.*
+import io.ktor.util.*
+import io.mockk.coEvery
+import io.mockk.mockk
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.kodein.di.DI
@@ -19,19 +23,20 @@ import org.kodein.di.bind
 import org.kodein.di.instance
 import org.kodein.di.singleton
 import org.litote.kmongo.coroutine.CoroutineDatabase
-import org.litote.kmongo.eq
-import org.litote.kmongo.set
-import org.litote.kmongo.setValue
 import org.mindrot.jbcrypt.BCrypt
 import run
 import security.JwtConfig
 import testConfig
 import testUser
 
-val jwtConfig = JwtConfig(testConfig)
-var testDi: DI = DI {}
-
+@KtorExperimentalAPI
+@ExperimentalSerializationApi
 class UsersControllerKtTest : DatabaseStringSpec() {
+    private val jwtConfig = JwtConfig(testConfig)
+    private var testDi: DI = DI {}
+    private val configStore = mockk<ConfigStore>()
+    private val nonExistingUser = User(email = "nonexisting@example.com", password = "somepswd")
+
     override fun beforeEach(testCase: TestCase) {
         super.beforeEach(testCase)
 
@@ -40,6 +45,7 @@ class UsersControllerKtTest : DatabaseStringSpec() {
             bind<CoroutineDatabase>() with singleton { client }
             bind<UserService>() with singleton { MongoUserService(instance()) }
             bind<JwtConfig>() with singleton { jwtConfig }
+            bind<ConfigStore>() with singleton { configStore }
         }
 
         val userColl = client.getCollection<User>("users")
@@ -101,138 +107,87 @@ class UsersControllerKtTest : DatabaseStringSpec() {
                 }
             }
         }
-    }
 
-    "Registration should succeed with valid data" {
-        withServer {
-            val database by di { application }.instance<CoroutineDatabase>()
-            val configColl = database.getCollection<BooleanConfig>("config")
-            runBlocking {
-                configColl.updateOne(
-                    BooleanConfig::key eq "allowRegistration",
-                    setValue(BooleanConfig::value, true),
-                    UpdateOptions().upsert(true)
-                )
+        "Registration should succeed with valid data" {
+            withTestApplication({ run(testDi) }) {
+                coEvery { configStore.getValue("allowRegistration") } returns true
+
+                val req = handleRequest {
+                    uri = "/users/register"
+                    method = HttpMethod.Post
+                    addHeader("Content-Type", "application/json")
+                    setBody(Json.encodeToString(EmailPasswordCredential(nonExistingUser.email, nonExistingUser.password)))
+                }
+
+                req.requestHandled shouldBe true
+                req.response shouldHaveStatus HttpStatusCode.Created
             }
+        }
 
-            val req = handleRequest {
-                uri = "/users/register"
-                method = HttpMethod.Post
-                addHeader("Content-Type", "application/json")
-                setBody(Json.encodeToString(EmailPasswordCredential(testUser.email, testUser.password)))
+        "Registration should be denied with deactivated config" {
+            withTestApplication({ run(testDi) }) {
+                coEvery { configStore.getValue("allowRegistration") } returns false
+
+                val req = handleRequest {
+                    uri = "/users/register"
+                    method = HttpMethod.Post
+                    addHeader("Content-Type", "application/json")
+                    setBody(Json.encodeToString(EmailPasswordCredential(nonExistingUser.email, nonExistingUser.password)))
+                }
+
+                req.requestHandled shouldBe true
+                req.response shouldHaveStatus HttpStatusCode.ServiceUnavailable
             }
+        }
 
-            req.requestHandled shouldBe true
-            req.response shouldHaveStatus HttpStatusCode.Created
+        "Registration should be denied with duplicate email config" {
+            withTestApplication({ run(testDi) }) {
+                coEvery { configStore.getValue("allowRegistration") } returns true
+
+                val req = handleRequest {
+                    uri = "/users/register"
+                    method = HttpMethod.Post
+                    addHeader("Content-Type", "application/json")
+                    setBody(Json.encodeToString(EmailPasswordCredential(testUser.email, testUser.password)))
+                }
+
+                req.requestHandled shouldBe true
+                req.response shouldHaveStatus HttpStatusCode.NotModified
+            }
+        }
+
+        "Registration should fail with only email" {
+            withTestApplication({ run(testDi) }) {
+                coEvery { configStore.getValue("allowRegistration") } returns true
+
+                val req = handleRequest {
+                    uri = "/users/register"
+                    method = HttpMethod.Post
+                    addHeader("Content-Type", "application/json")
+                    setBody("""{"email": "${nonExistingUser.email}"}""")
+                }
+
+                req.requestHandled shouldBe true
+                req.response shouldHaveStatus HttpStatusCode.BadRequest
+                req.response.content shouldBe "Field 'password' is required, but it was missing"
+            }
+        }
+
+        "Registration should fail with only password" {
+            withTestApplication({ run(testDi) }) {
+                coEvery { configStore.getValue("allowRegistration") } returns true
+
+                val req = handleRequest {
+                    uri = "/users/register"
+                    method = HttpMethod.Post
+                    addHeader("Content-Type", "application/json")
+                    setBody("""{"password": "${nonExistingUser.password}"}""")
+                }
+
+                req.requestHandled shouldBe true
+                req.response shouldHaveStatus HttpStatusCode.BadRequest
+                req.response.content shouldBe "Field 'email' is required, but it was missing"
+            }
         }
     }
-
-    "Registration should be denied with deactivated config" {
-        withServer {
-            val database by di { application }.instance<CoroutineDatabase>()
-            val configColl = database.getCollection<BooleanConfig>("config")
-            runBlocking {
-                configColl.updateOne(
-                    BooleanConfig::key eq "allowRegistration",
-                    setValue(BooleanConfig::value, false),
-                    UpdateOptions().upsert(true)
-                )
-            }
-
-            val req = handleRequest {
-                uri = "/users/register"
-                method = HttpMethod.Post
-                addHeader("Content-Type", "application/json")
-                setBody(Json.encodeToString(EmailPasswordCredential(testUser.email, testUser.password)))
-            }
-
-            req.requestHandled shouldBe true
-            req.response shouldHaveStatus HttpStatusCode.ServiceUnavailable
-        }
-    }
-
-    "Registration should be denied with duplicate email config" {
-        withServer {
-            val database by di { application }.instance<CoroutineDatabase>()
-            val configColl = database.getCollection<BooleanConfig>("config")
-            val userColl = database.getCollection<User>("users")
-
-            runBlocking {
-                configColl.updateOne(
-                    BooleanConfig::key eq "allowRegistration",
-                    setValue(BooleanConfig::value, true),
-                    UpdateOptions().upsert(true)
-                )
-
-                userColl.insertOne(
-                    User(
-                        email = testUser.email,
-                        password = testUser.password
-                    )
-                )
-            }
-
-            val req = handleRequest {
-                uri = "/users/register"
-                method = HttpMethod.Post
-                addHeader("Content-Type", "application/json")
-                setBody(Json.encodeToString(EmailPasswordCredential(testUser.email, testUser.password)))
-            }
-
-            req.requestHandled shouldBe true
-            req.response shouldHaveStatus HttpStatusCode.NotModified
-        }
-    }
-
-    "Registration should fail with only email" {
-        withServer {
-            val database by di { application }.instance<CoroutineDatabase>()
-            val configColl = database.getCollection<BooleanConfig>("config")
-
-            runBlocking {
-                configColl.updateOne(
-                    BooleanConfig::key eq "allowRegistration",
-                    setValue(BooleanConfig::value, true),
-                    UpdateOptions().upsert(true)
-                )
-            }
-
-            val req = handleRequest {
-                uri = "/users/register"
-                method = HttpMethod.Post
-                addHeader("Content-Type", "application/json")
-                setBody("""{"email": "email@example.com"}""")
-            }
-
-            req.requestHandled shouldBe true
-            req.response shouldHaveStatus HttpStatusCode.BadRequest
-            req.response.content shouldBe "Field 'password' is required, but it was missing"
-        }
-    }
-
-    "Registration should fail with only password" {
-        withServer {
-            val database by di { application }.instance<CoroutineDatabase>()
-            val configColl = database.getCollection<BooleanConfig>("config")
-
-            runBlocking {
-                configColl.updateOne(
-                    BooleanConfig::key eq "allowRegistration",
-                    setValue(BooleanConfig::value, true),
-                    UpdateOptions().upsert(true)
-                )
-            }
-
-            val req = handleRequest {
-                uri = "/users/register"
-                method = HttpMethod.Post
-                addHeader("Content-Type", "application/json")
-                setBody("""{"password": "asdf"}""")
-            }
-
-            req.requestHandled shouldBe true
-            req.response shouldHaveStatus HttpStatusCode.BadRequest
-            req.response.content shouldBe "Field 'email' is required, but it was missing"
-        }
-    }
-})
+}

@@ -1,8 +1,6 @@
 package app
 
 import ConfigStore
-import com.configcat.ConfigCatClient
-import com.mongodb.DuplicateKeyException
 import com.mongodb.ErrorCategory
 import com.mongodb.MongoWriteException
 import io.ktor.application.*
