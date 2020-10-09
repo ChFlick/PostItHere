@@ -27,6 +27,7 @@ dependencies {
     testImplementation("io.kotest:kotest-assertions-ktor:$kotest_version") // for kotest property test
     testImplementation("io.ktor:ktor-server-test-host:$ktor_version")
     testImplementation("io.mockk:mockk:$mockk_version")
+    testImplementation("org.testcontainers:mongodb:1.14.3")
 
     implementation("io.ktor:ktor-server-netty:$ktor_version")
     implementation("io.ktor:ktor-html-builder:$ktor_version")

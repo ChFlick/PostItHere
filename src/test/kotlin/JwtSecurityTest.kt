@@ -1,38 +1,30 @@
-import app.User
+import app.UserService
 import io.kotest.assertions.ktor.shouldHaveStatus
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 import io.ktor.http.*
-import kotlinx.coroutines.runBlocking
-import org.kodein.di.instance
-import org.kodein.di.ktor.di
-import org.litote.kmongo.coroutine.CoroutineDatabase
+import io.ktor.server.testing.*
+import io.mockk.coEvery
+import io.mockk.mockk
+import org.kodein.di.DI
+import org.kodein.di.bind
+import org.kodein.di.singleton
+import security.JwtConfig
 
 class JwtSecurityTest : StringSpec({
-    val user = User(email = "test@example.com", password = "test")
+    var testDi = DI {}
+    val userService = mockk<UserService>();
 
     beforeEach {
-        withServer {
-            val database by di { application }.instance<CoroutineDatabase>()
-            val userColl = database.getCollection<User>("users")
-            runBlocking {
-                userColl.insertOne(user)
-            }
-        }
-    }
-
-    afterEach {
-        withServer {
-            val database by di { application }.instance<CoroutineDatabase>()
-            val userColl = database.getCollection<User>("users")
-            runBlocking {
-                userColl.deleteOneById(user.id!!)
-            }
+        val jwtConfig = JwtConfig(testConfig)
+        testDi = DI {
+            bind<UserService>() with singleton { userService }
+            bind<JwtConfig>() with singleton { jwtConfig }
         }
     }
 
     "A Request should fail without a token" {
-        withServer {
+        withTestApplication({ run(testDi) }) {
             val req = handleRequest {
                 uri = "/secret"
             }
@@ -43,7 +35,7 @@ class JwtSecurityTest : StringSpec({
     }
 
     "A Request should fail with an invalid token" {
-        withServer {
+        withTestApplication({ run(testDi) }) {
             val req = handleRequest {
                 uri = "/secret"
                 addHeader("Authorization", "Bearer haofsi7yfa8ohfoahfa3784hfoa")
@@ -55,10 +47,12 @@ class JwtSecurityTest : StringSpec({
     }
 
     "A Request should succeed with a correct token" {
-        withServer {
+        coEvery { userService.getUserById(testUser.id.toString()) } returns testUser
+
+        withTestApplication({ run(testDi) }) {
             val req = handleRequest {
                 uri = "/secret"
-                addJwtHeader(user)
+                addJwtHeader()
             }
 
             req.requestHandled shouldBe true

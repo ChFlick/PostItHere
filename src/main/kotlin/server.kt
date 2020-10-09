@@ -57,24 +57,28 @@ fun initDatabase(config: ApplicationConfig): CoroutineDatabase {
 @KtorExperimentalAPI
 @SuppressWarnings("unused") // used in application.conf
 fun Application.main() {
-    di {
+    run(DI {
         bind<CoroutineDatabase>() with singleton { initDatabase(environment.config) }
         bind<ConfigStore>() with singleton { ConfigStore(instance()) }
         bind<UserService>() with singleton { MongoUserService(instance()) }
         bind<FormService>() with singleton { FormService(instance()) }
         bind<JwtConfig>() with singleton { JwtConfig(environment.config) }
-        bind<ConfigCatClient>() with singleton {
-            ConfigCatClient(
-                environment.config.property("configcat.apikey").getString()
-            )
-        }
+    })
+}
+
+@ExperimentalSerializationApi
+@KtorExperimentalAPI
+@SuppressWarnings("unused") // used in application.conf
+fun Application.run(di: DI) {
+    di {
+        extend(di)
     }
 
     install(Authentication) {
         val userService by di().instance<UserService>()
         val jwtConfig by di().instance<JwtConfig>()
-        val jwtAudience = environment.config.property("jwt.audience").getString()
-        val jwtRealm = environment.config.property("jwt.realm").getString()
+        val jwtAudience = environment.config.propertyOrNull("jwt.audience")?.getString() ?: "test"
+        val jwtRealm = environment.config.propertyOrNull("jwt.realm")?.getString() ?: "test"
 
         jwt {
             realm = jwtRealm
