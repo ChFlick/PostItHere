@@ -11,6 +11,7 @@ plugins {
     kotlin("plugin.serialization") version "1.4.10"
     id("com.adarshr.test-logger") version "2.1.0"
     application
+    jacoco
 }
 
 group = "org.postithere"
@@ -49,6 +50,11 @@ tasks.withType<KotlinCompile>() {
 }
 tasks.withType<Test> {
     useJUnitPlatform()
+}
+tasks.jacocoTestReport {
+    reports {
+        xml.isEnabled = true
+    }
 }
 
 application {
