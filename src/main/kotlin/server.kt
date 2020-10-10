@@ -5,17 +5,24 @@ import com.mongodb.ConnectionString
 import com.mongodb.MongoClientSettings
 import com.mongodb.MongoCredential
 import com.mongodb.WriteConcern
-import io.ktor.application.*
-import io.ktor.auth.*
-import io.ktor.auth.jwt.*
-import io.ktor.client.request.forms.*
-import io.ktor.config.*
-import io.ktor.features.*
-import io.ktor.http.*
-import io.ktor.response.*
-import io.ktor.routing.*
-import io.ktor.serialization.*
-import io.ktor.util.*
+import io.ktor.application.Application
+import io.ktor.application.call
+import io.ktor.application.install
+import io.ktor.auth.Authentication
+import io.ktor.auth.jwt.jwt
+import io.ktor.config.ApplicationConfig
+import io.ktor.features.CORS
+import io.ktor.features.CallLogging
+import io.ktor.features.ContentNegotiation
+import io.ktor.features.DefaultHeaders
+import io.ktor.features.StatusPages
+import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpMethod
+import io.ktor.http.HttpStatusCode
+import io.ktor.response.respond
+import io.ktor.routing.Routing
+import io.ktor.serialization.json
+import io.ktor.util.KtorExperimentalAPI
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerializationException
 import org.kodein.di.DI
@@ -29,7 +36,6 @@ import org.litote.kmongo.reactivestreams.KMongo
 import org.slf4j.event.Level
 import routes.routes
 import security.JwtConfig
-import kotlin.text.toCharArray
 
 
 @KtorExperimentalAPI
@@ -47,11 +53,10 @@ fun initDatabase(config: ApplicationConfig): CoroutineDatabase {
         .writeConcern(WriteConcern.ACKNOWLEDGED)
         .build()
 
-    val client = KMongo.createClient(mongoClientSettings).coroutine //use coroutine extension
+    val client = KMongo.createClient(mongoClientSettings).coroutine // use coroutine extension
 
-    return client.getDatabase(config.property("mongodb.database").getString()) //normal java driver usage
+    return client.getDatabase(config.property("mongodb.database").getString()) // normal java driver usage
 }
-
 
 @ExperimentalSerializationApi
 @KtorExperimentalAPI

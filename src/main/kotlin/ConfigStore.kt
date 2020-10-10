@@ -1,7 +1,5 @@
 import com.mongodb.MongoException
-import com.mongodb.client.model.IndexOptions
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.runInterruptible
 import kotlinx.serialization.Serializable
 import org.litote.kmongo.coroutine.CoroutineDatabase
 import org.litote.kmongo.eq

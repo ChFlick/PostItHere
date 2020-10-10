@@ -1,12 +1,12 @@
 package security
 
-import com.auth0.jwt.*
-import com.auth0.jwt.algorithms.*
-import com.typesafe.config.ConfigFactory
-import io.ktor.config.*
-import io.ktor.util.*
 import app.User
-import java.util.*
+import com.auth0.jwt.JWT
+import com.auth0.jwt.JWTVerifier
+import com.auth0.jwt.algorithms.Algorithm
+import io.ktor.config.ApplicationConfig
+import io.ktor.util.KtorExperimentalAPI
+import java.util.Date
 
 private const val validityInMs = 36_000_00 * 10 // 10 hours
 
