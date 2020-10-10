@@ -4,10 +4,12 @@ import ConfigStore
 import com.mongodb.ErrorCategory
 import com.mongodb.MongoWriteException
 import io.ktor.application.*
+import io.ktor.features.*
 import io.ktor.http.*
 import io.ktor.request.*
 import io.ktor.response.*
 import io.ktor.routing.*
+import io.ktor.util.*
 import io.ktor.util.pipeline.*
 import org.kodein.di.instance
 import org.kodein.di.ktor.di
@@ -37,7 +39,19 @@ fun Routing.users() {
 private suspend fun PipelineContext<Unit, ApplicationCall>.login(userService: UserService) {
     val jwtConfig by di().instance<JwtConfig>()
 
-    val credentials = call.receive<EmailPasswordCredential>()
+    val credentials =
+        when (call.request.contentType()) {
+            ContentType.Application.FormUrlEncoded -> call.receiveParameters().let {
+                EmailPasswordCredential(
+                    it.getOrFail("email"),
+                    it.getOrFail("password")
+                )
+            }
+            ContentType.Application.Json -> call.receive()
+            else -> {
+                throw BadRequestException("Unsupported ContentType ${call.request.contentType()}")
+            }
+        }
     val user = userService.getUserByCredentials(credentials)
 
     if (user == null) {

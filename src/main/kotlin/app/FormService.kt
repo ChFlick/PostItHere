@@ -14,6 +14,8 @@ import org.litote.kmongo.eq
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 
+const val FORMS_COLLECTION = "forms"
+
 @ExperimentalSerializationApi
 @Serializer(forClass = ZonedDateTime::class)
 object InstantSerializer : KSerializer<ZonedDateTime> {
@@ -40,7 +42,7 @@ data class Form(
 
 class FormService(database: CoroutineDatabase) {
     @ExperimentalSerializationApi
-    private val requestCollection = database.getCollection<Form>("forms")
+    private val requestCollection = database.getCollection<Form>(FORMS_COLLECTION)
 
     @ExperimentalSerializationApi
     suspend fun getFormsByFormId(formId: String): List<Form> {

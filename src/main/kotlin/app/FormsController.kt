@@ -3,6 +3,7 @@ package app
 import io.ktor.application.*
 import io.ktor.auth.*
 import io.ktor.http.*
+import io.ktor.request.*
 import io.ktor.response.*
 import io.ktor.routing.*
 import io.ktor.util.*
@@ -16,26 +17,25 @@ import java.time.ZonedDateTime
 fun Routing.forms() {
     val formService by di().instance<FormService>()
 
-    authenticate {
-        route("forms") {
-            route("{formId}") {
+    route("forms") {
+        route("{formId}") {
 
+            authenticate {
                 get {
                     getSubmittedForms(formService)
                 }
+            }
 
-                route("submit") {
-                    get {
-                        submitForm(formService)
-                    }
-                    post {
-                        submitForm(formService)
-                    }
+            route("submit") {
+                get {
+                    submitForm(formService)
+                }
+                post {
+                    submitForm(formService)
                 }
             }
         }
     }
-
 }
 
 @ExperimentalSerializationApi
@@ -64,7 +64,10 @@ private suspend fun PipelineContext<Unit, ApplicationCall>.submitForm(
         return
     }
 
-    val parameters = call.parameters.toMap()
+    val parameterContainer =
+        if (call.request.httpMethod === HttpMethod.Get) call.parameters
+        else call.receiveParameters()
+    val parameters = parameterContainer.toMap()
         .filterKeys { it != "formId" }
         .mapValues { it.value.single() }
     val request = Form(
@@ -75,7 +78,7 @@ private suspend fun PipelineContext<Unit, ApplicationCall>.submitForm(
     )
 
     if (formService.insertRequest(request)) {
-        call.respond("Ok")
+        call.respond(HttpStatusCode.Created, request)
     } else {
         call.respond(HttpStatusCode.InternalServerError)
     }

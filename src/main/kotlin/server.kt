@@ -8,6 +8,7 @@ import com.mongodb.WriteConcern
 import io.ktor.application.*
 import io.ktor.auth.*
 import io.ktor.auth.jwt.*
+import io.ktor.client.request.forms.*
 import io.ktor.config.*
 import io.ktor.features.*
 import io.ktor.http.*
@@ -25,6 +26,7 @@ import org.kodein.di.singleton
 import org.litote.kmongo.coroutine.CoroutineDatabase
 import org.litote.kmongo.coroutine.coroutine
 import org.litote.kmongo.reactivestreams.KMongo
+import org.slf4j.event.Level
 import routes.routes
 import security.JwtConfig
 import kotlin.text.toCharArray
@@ -118,7 +120,9 @@ fun Application.run(di: DI) {
     }
 
     install(DefaultHeaders)
-    install(CallLogging)
+    install(CallLogging) {
+        level = Level.DEBUG
+    }
     install(Routing) {
         routes()
     }

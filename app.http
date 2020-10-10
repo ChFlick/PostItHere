@@ -1,0 +1,38 @@
+######################
+# FORM
+######################
+
+### List all form submissions of a specific form
+GET http://{{url}}:{{port}}/forms/1
+Authorization: Bearer {{auth_token}}
+
+### GET a new form submission
+GET http://{{url}}:{{port}}/forms/1/submit?somekey=somevalue
+
+### POST a new form submission
+POST http://{{url}}:{{port}}/forms/1/submit
+Content-Type: application/x-www-form-urlencoded
+
+somekey=somevalue
+
+######################
+# LOGIN
+######################
+### Login to fetch a token
+POST http://{{url}}:{{port}}/users/login
+Content-Type: application/x-www-form-urlencoded
+
+email=user@example.com&password=test
+
+> {% client.global.set("auth_token", response.body); %}
+
+### Login to fetch a token using JSON
+POST http://{{url}}:{{port}}/users/login
+Content-Type: application/json
+
+{
+  "email": "user@example.com",
+  "password": "test"
+}
+
+> {% client.global.set("auth_token", response.body); %}

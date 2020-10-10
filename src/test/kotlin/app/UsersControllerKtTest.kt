@@ -90,13 +90,31 @@ class UsersControllerKtTest : DatabaseStringSpec() {
             }
         }
 
-        "Login should succeed with valid credentials" {
+        "Login should succeed with valid credentials with json" {
             withTestApplication({ run(testDi) }) {
                 val req = handleRequest {
                     uri = "/users/login"
                     method = HttpMethod.Post
                     addHeader("Content-Type", "application/json")
                     setBody(Json.encodeToString(EmailPasswordCredential(testUser.email, testUser.password)))
+                }
+
+                req.requestHandled shouldBe true
+                req.response shouldHaveStatus HttpStatusCode.OK
+                req.response.content.let {
+                    it.shouldNotBeNull()
+                    it.shouldNotBeBlank()
+                }
+            }
+        }
+
+        "Login should succeed with valid credentials with form data" {
+            withTestApplication({ run(testDi) }) {
+                val req = handleRequest {
+                    uri = "/users/login"
+                    method = HttpMethod.Post
+                    addHeader("Content-Type", ContentType.Application.FormUrlEncoded.toString())
+                    setBody("""email=${testUser.email}&password=${testUser.password}""")
                 }
 
                 req.requestHandled shouldBe true
