@@ -1,6 +1,5 @@
 package app
 
-import ConfigStore
 import DatabaseStringSpec
 import TestDbContainer
 import addJwtHeader
@@ -9,12 +8,8 @@ import io.kotest.core.test.TestCase
 import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.maps.shouldContainExactly
 import io.kotest.matchers.nulls.shouldBeNull
-import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
-import io.kotest.matchers.shouldHave
 import io.kotest.matchers.shouldNotBe
-import io.kotest.matchers.string.shouldNotBeBlank
-import io.ktor.client.engine.mock.*
 import io.ktor.client.request.forms.*
 import io.ktor.http.*
 import io.ktor.server.testing.*
@@ -29,10 +24,8 @@ import kotlinx.serialization.json.Json
 import org.kodein.di.DI
 import org.kodein.di.bind
 import org.kodein.di.instance
-import org.kodein.di.ktor.di
 import org.kodein.di.singleton
 import org.litote.kmongo.coroutine.CoroutineDatabase
-import org.mindrot.jbcrypt.BCrypt
 import run
 import security.JwtConfig
 import testConfig
@@ -88,7 +81,7 @@ class FormsControllerKtTest : DatabaseStringSpec() {
 
         "Fetching submitted form data with forms should return those forms" {
             withTestApplication({ run(testDi) }) {
-                val testForm = Form(
+                val testForm = FormSubmit(
                     "1",
                     "origin",
                     mapOf("left" to "right"),
@@ -96,7 +89,7 @@ class FormsControllerKtTest : DatabaseStringSpec() {
                 )
 
                 runBlocking {
-                    TestDbContainer.client.getCollection<Form>(FORMS_COLLECTION).insertOne(testForm)
+                    TestDbContainer.client.getCollection<FormSubmit>(SUBMITTED_FORMS_COLLECTION).insertOne(testForm)
                 }
 
                 val req = handleRequest {
@@ -119,7 +112,7 @@ class FormsControllerKtTest : DatabaseStringSpec() {
                 req.requestHandled shouldBe true
                 req.response shouldHaveStatus HttpStatusCode.Created
                 req.response.content shouldNotBe null
-                val form = Json.decodeFromString<Form>(req.response.content!!)
+                val form = Json.decodeFromString<FormSubmit>(req.response.content!!)
                 form.formId.length shouldBeGreaterThan 0
                 form.parameters shouldContainExactly mapOf("somekey" to "somevalue")
             }
@@ -137,7 +130,7 @@ class FormsControllerKtTest : DatabaseStringSpec() {
                 req.requestHandled shouldBe true
                 req.response shouldHaveStatus HttpStatusCode.Created
                 req.response.content shouldNotBe null
-                val form = Json.decodeFromString<Form>(req.response.content!!)
+                val form = Json.decodeFromString<FormSubmit>(req.response.content!!)
                 form.formId.length shouldBeGreaterThan 0
                 form.parameters shouldContainExactly mapOf("somekey" to "somevalue")
             }

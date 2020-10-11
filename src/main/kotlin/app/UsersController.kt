@@ -6,6 +6,7 @@ import com.mongodb.MongoWriteException
 import io.ktor.application.ApplicationCall
 import io.ktor.application.ApplicationCallPipeline
 import io.ktor.application.call
+import io.ktor.auth.authenticate
 import io.ktor.features.BadRequestException
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
@@ -20,6 +21,7 @@ import io.ktor.routing.post
 import io.ktor.routing.route
 import io.ktor.util.getOrFail
 import io.ktor.util.pipeline.PipelineContext
+import kotlinx.serialization.Serializable
 import org.kodein.di.instance
 import org.kodein.di.ktor.di
 import security.JwtConfig
@@ -41,6 +43,13 @@ fun Routing.users() {
             }
 
             post { register(userService) }
+        }
+        authenticate {
+            route("{userId}") {
+                route("forms") {
+                    post { addForm(userService) }
+                }
+            }
         }
     }
 }
@@ -72,20 +81,32 @@ private suspend fun PipelineContext<Unit, ApplicationCall>.login(userService: Us
 }
 
 private suspend fun PipelineContext<Unit, ApplicationCall>.register(userService: UserService) {
-    val user = call.receiveOrNull(User::class)
+    val user = call.receive<User>()
 
-    if (user != null) {
-        try {
-            userService.addUser(user)
-            call.respond(HttpStatusCode.Created)
-        } catch (e: MongoWriteException) {
-            if (e.error.category == ErrorCategory.DUPLICATE_KEY) {
-                call.respond(HttpStatusCode.NotModified)
-            } else {
-                call.respond(HttpStatusCode.InternalServerError)
-            }
+    try {
+        userService.addUser(user)
+        call.respond(HttpStatusCode.Created)
+    } catch (e: MongoWriteException) {
+        if (e.error.category == ErrorCategory.DUPLICATE_KEY) {
+            call.respond(HttpStatusCode.NotModified)
+        } else {
+            call.respond(HttpStatusCode.InternalServerError)
         }
-    } else {
-        call.respond(HttpStatusCode.InternalServerError)
+    }
+}
+
+private suspend fun PipelineContext<Unit, ApplicationCall>.addForm(userService: UserService) {
+    val userId = checkNotNull(call.parameters["userId"])
+    val form = call.receive<Form>()
+
+    try {
+        userService.addFormToUser(userId, form)
+        call.respond(HttpStatusCode.Created)
+    } catch (e: MongoWriteException) {
+        if (e.error.category == ErrorCategory.DUPLICATE_KEY) {
+            call.respond(HttpStatusCode.NotModified)
+        } else {
+            call.respond(HttpStatusCode.InternalServerError)
+        }
     }
 }

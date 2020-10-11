@@ -19,6 +19,7 @@ import io.ktor.features.StatusPages
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
+import io.ktor.request.ContentTransformationException
 import io.ktor.response.respond
 import io.ktor.routing.Routing
 import io.ktor.serialization.json
@@ -119,6 +120,11 @@ fun Application.run(di: DI) {
 
     install(StatusPages) {
         exception<SerializationException> { cause ->
+            cause.message?.let { call.respond(HttpStatusCode.BadRequest, it) }
+                ?: call.respond(HttpStatusCode.BadRequest)
+        }
+
+        exception<ContentTransformationException> { cause ->
             cause.message?.let { call.respond(HttpStatusCode.BadRequest, it) }
                 ?: call.respond(HttpStatusCode.BadRequest)
         }

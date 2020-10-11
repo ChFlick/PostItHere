@@ -55,7 +55,7 @@ private suspend fun PipelineContext<Unit, ApplicationCall>.getSubmittedForms(
         return
     }
 
-    val forms = formService.getFormsByFormId(formId)
+    val forms = formService.getSubmitsByFormId(formId)
     call.respond(forms)
 }
 
@@ -76,7 +76,7 @@ private suspend fun PipelineContext<Unit, ApplicationCall>.submitForm(
     val parameters = parameterContainer.toMap()
         .filterKeys { it != "formId" }
         .mapValues { it.value.single() }
-    val request = Form(
+    val request = FormSubmit(
         formId,
         call.request.headers["origin"],
         parameters,
