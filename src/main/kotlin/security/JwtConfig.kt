@@ -11,7 +11,7 @@ import java.util.Date
 private const val validityInMs = 36_000_00 * 10 // 10 hours
 
 @KtorExperimentalAPI
-class JwtConfig(private val config: ApplicationConfig) {
+class JwtConfig(config: ApplicationConfig) {
     private val secret = config.property("jwt.secret").getString()
     private val issuer = config.property("jwt.issuer").getString()
     private val audience = config.property("jwt.audience").getString()

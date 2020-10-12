@@ -1,6 +1,7 @@
 package app
 
 import io.ktor.application.ApplicationCall
+import io.ktor.application.ApplicationCallPipeline
 import io.ktor.application.call
 import io.ktor.auth.authenticate
 import io.ktor.http.HttpMethod
@@ -22,9 +23,25 @@ import java.time.ZonedDateTime
 @ExperimentalSerializationApi
 fun Routing.forms() {
     val formService by di().instance<FormService>()
+    val userService by di().instance<UserService>()
 
     route("forms") {
         route("{formId}") {
+
+            intercept(ApplicationCallPipeline.Features) {
+                val formId = call.parameters["formId"]
+
+                if (formId == null) {
+                    call.respond(HttpStatusCode.BadRequest, "A formId must be provided in the path")
+                    finish()
+                    return@intercept
+                }
+
+                if(!userService.isFormIdAvailable(formId)) {
+                    call.respond(HttpStatusCode.NotFound, "The form with the formId $formId was not found")
+                    finish()
+                }
+            }
 
             authenticate {
                 get {
@@ -48,14 +65,8 @@ fun Routing.forms() {
 private suspend fun PipelineContext<Unit, ApplicationCall>.getSubmittedForms(
     formService: FormService
 ) {
-    val formId = call.parameters["formId"]
-
-    if (formId == null) {
-        call.respond(HttpStatusCode.BadRequest, "A formId must be provided in the path")
-        return
-    }
-
-    val forms = formService.getFormsByFormId(formId)
+    val formId = call.parameters["formId"]!!
+    val forms = formService.getSubmitsByFormId(formId)
     call.respond(forms)
 }
 
@@ -63,12 +74,7 @@ private suspend fun PipelineContext<Unit, ApplicationCall>.getSubmittedForms(
 private suspend fun PipelineContext<Unit, ApplicationCall>.submitForm(
     formService: FormService
 ) {
-    val formId = call.parameters["formId"]
-
-    if (formId == null) {
-        call.respond(HttpStatusCode.BadRequest, "A formId must be provided in the path")
-        return
-    }
+    val formId = call.parameters["formId"]!!
 
     val parameterContainer =
         if (call.request.httpMethod === HttpMethod.Get) call.parameters
@@ -76,7 +82,7 @@ private suspend fun PipelineContext<Unit, ApplicationCall>.submitForm(
     val parameters = parameterContainer.toMap()
         .filterKeys { it != "formId" }
         .mapValues { it.value.single() }
-    val request = Form(
+    val request = FormSubmit(
         formId,
         call.request.headers["origin"],
         parameters,

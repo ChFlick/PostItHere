@@ -1,12 +1,8 @@
 import app.User
 import com.typesafe.config.ConfigFactory
-import io.ktor.application.*
-import io.ktor.config.*
-import io.ktor.server.engine.*
-import io.ktor.server.testing.*
-import org.litote.kmongo.Id
+import io.ktor.config.HoconApplicationConfig
+import io.ktor.server.testing.TestApplicationRequest
 import org.litote.kmongo.id.IdGenerator
-import org.slf4j.LoggerFactory
 import security.JwtConfig
 
 var testUser = User(IdGenerator.defaultGenerator.generateNewId(), "test@example.com", "test")

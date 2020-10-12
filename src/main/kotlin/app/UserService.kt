@@ -15,6 +15,8 @@ import org.litote.kmongo.eq
 import org.litote.kmongo.id.MongoId
 import org.mindrot.jbcrypt.BCrypt
 
+const val USERS_COLLECTION = "users"
+
 @Serializable
 data class ApiKey(
     val key: String,
@@ -23,12 +25,19 @@ data class ApiKey(
 )
 
 @Serializable
+data class Form(
+    @Contextual @SerialName("_id") @MongoId val id: Id<Form>? = null,
+    val formId: String,
+    val name: String
+)
+
+@Serializable
 data class User(
     @Contextual @SerialName("_id") @MongoId val id: Id<User>? = null,
     val email: String,
     val password: String,
     val apiKey: ApiKey? = null,
-    val formIds: List<String>? = emptyList()
+    val forms: List<Form>? = emptyList()
 ) : Principal
 
 @Serializable
@@ -39,7 +48,9 @@ interface UserService {
 
     suspend fun addUser(user: User): Boolean
 
-    suspend fun addFormToUser(user: User, formId: String): Boolean
+    suspend fun addFormToUser(userId: String, form: Form): Boolean
+
+    suspend fun isFormIdAvailable(formId: String): Boolean
 
     suspend fun getUserById(userId: String): User?
 
@@ -47,7 +58,8 @@ interface UserService {
 }
 
 class MongoUserService(database: CoroutineDatabase) : UserService {
-    private val userCollection = database.getCollection<User>("users").withWriteConcern(WriteConcern.MAJORITY)
+    private val userCollection = database.getCollection<User>(USERS_COLLECTION)
+        .withWriteConcern(WriteConcern.MAJORITY)
 
     init {
         runBlocking {
@@ -65,17 +77,21 @@ class MongoUserService(database: CoroutineDatabase) : UserService {
             user.email,
             BCrypt.hashpw(user.password, BCrypt.gensalt()),
             user.apiKey,
-            user.formIds
+            user.forms
         )
 
         return userCollection.insertOne(userWithHashedPassword).wasAcknowledged()
     }
 
-    override suspend fun addFormToUser(user: User, formId: String): Boolean {
+    override suspend fun addFormToUser(userId: String, form: Form): Boolean {
         return userCollection.updateOne(
-            User::email eq user.email,
-            addToSet(User::formIds, formId)
+            User::id eq ObjectId(userId),
+            addToSet(User::forms, form)
         ).modifiedCount == 1L
+    }
+
+    override suspend fun isFormIdAvailable(formId: String): Boolean {
+        return userCollection.findOne("""{"forms.formId":"$formId"}""") != null
     }
 
     override suspend fun getUserById(userId: String): User? {
