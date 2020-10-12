@@ -50,6 +50,8 @@ interface UserService {
 
     suspend fun addFormToUser(userId: String, form: Form): Boolean
 
+    suspend fun isFormIdAvailable(formId: String): Boolean
+
     suspend fun getUserById(userId: String): User?
 
     suspend fun getUserByCredentials(credential: EmailPasswordCredential): User?
@@ -86,6 +88,10 @@ class MongoUserService(database: CoroutineDatabase) : UserService {
             User::id eq ObjectId(userId),
             addToSet(User::forms, form)
         ).modifiedCount == 1L
+    }
+
+    override suspend fun isFormIdAvailable(formId: String): Boolean {
+        return userCollection.findOne("""{"forms.formId":"$formId"}""") != null
     }
 
     override suspend fun getUserById(userId: String): User? {

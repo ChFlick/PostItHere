@@ -14,8 +14,6 @@ import io.ktor.client.request.forms.*
 import io.ktor.http.*
 import io.ktor.server.testing.*
 import io.ktor.util.*
-import io.mockk.coEvery
-import io.mockk.mockk
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromString
@@ -26,6 +24,7 @@ import org.kodein.di.bind
 import org.kodein.di.instance
 import org.kodein.di.singleton
 import org.litote.kmongo.coroutine.CoroutineDatabase
+import org.mindrot.jbcrypt.BCrypt
 import run
 import security.JwtConfig
 import testConfig
@@ -39,17 +38,35 @@ class FormsControllerKtTest : DatabaseStringSpec() {
     private val jwtConfig = JwtConfig(testConfig)
     private var testDi: DI = DI {}
 
+    private val EXISTING_FORM_ID = "1"
+    private val NON_EXISTING_FORM_ID = "nonexisting"
+
     override fun beforeEach(testCase: TestCase) {
         super.beforeEach(testCase)
 
         val client = TestDbContainer.client
-        val userService = mockk<UserService>()
-        coEvery { userService.getUserById(testUser.id.toString()) } returns testUser
         testDi = DI {
             bind<CoroutineDatabase>() with singleton { client }
-            bind<UserService>() with singleton { userService }
+            bind<UserService>() with singleton { MongoUserService(instance()) }
             bind<FormService>() with singleton { FormService(instance()) }
             bind<JwtConfig>() with singleton { jwtConfig }
+        }
+
+        val userColl = client.getCollection<User>(USERS_COLLECTION)
+        runBlocking {
+            userColl.insertOne(
+                User(
+                    testUser.id,
+                    testUser.email,
+                    BCrypt.hashpw(testUser.password, BCrypt.gensalt()),
+                    forms = listOf(
+                        Form(
+                            formId = EXISTING_FORM_ID,
+                            name = "someForm"
+                        )
+                    )
+                )
+            )
         }
     }
 
@@ -57,7 +74,7 @@ class FormsControllerKtTest : DatabaseStringSpec() {
         "Fetching submitted form data should fail without auth" {
             withTestApplication({ run(testDi) }) {
                 val req = handleRequest {
-                    uri = "/forms/1"
+                    uri = "/forms/$EXISTING_FORM_ID"
                 }
 
                 req.requestHandled shouldBe true
@@ -69,7 +86,7 @@ class FormsControllerKtTest : DatabaseStringSpec() {
         "Fetching submitted form data without forms should return an empty list" {
             withTestApplication({ run(testDi) }) {
                 val req = handleRequest {
-                    uri = "/forms/1"
+                    uri = "/forms/$EXISTING_FORM_ID"
                     addJwtHeader()
                 }
 
@@ -79,10 +96,23 @@ class FormsControllerKtTest : DatabaseStringSpec() {
             }
         }
 
+        "Fetching submitted form data for an non-existing form should return an 404" {
+            withTestApplication({ run(testDi) }) {
+                val req = handleRequest {
+                    uri = "/forms/$NON_EXISTING_FORM_ID"
+                    addJwtHeader()
+                }
+
+                req.requestHandled shouldBe true
+                req.response shouldHaveStatus HttpStatusCode.NotFound
+                req.response.content shouldBe "The form with the formId $NON_EXISTING_FORM_ID was not found"
+            }
+        }
+
         "Fetching submitted form data with forms should return those forms" {
             withTestApplication({ run(testDi) }) {
                 val testForm = FormSubmit(
-                    "1",
+                    EXISTING_FORM_ID,
                     "origin",
                     mapOf("left" to "right"),
                     ZonedDateTime.of(1, 1, 1, 1, 1, 1, 1, ZoneId.systemDefault())
@@ -93,7 +123,7 @@ class FormsControllerKtTest : DatabaseStringSpec() {
                 }
 
                 val req = handleRequest {
-                    uri = "/forms/1"
+                    uri = "/forms/$EXISTING_FORM_ID"
                     addJwtHeader()
                 }
 
@@ -106,7 +136,7 @@ class FormsControllerKtTest : DatabaseStringSpec() {
         "submitting form data via GET should work" {
             withTestApplication({ run(testDi) }) {
                 val req = handleRequest {
-                    uri = "/forms/1/submit?somekey=somevalue"
+                    uri = "/forms/$EXISTING_FORM_ID/submit?somekey=somevalue"
                 }
 
                 req.requestHandled shouldBe true
@@ -118,10 +148,25 @@ class FormsControllerKtTest : DatabaseStringSpec() {
             }
         }
 
+        "submitting form data should fail for a non-existing form" {
+            withTestApplication({ run(testDi) }) {
+                val req = handleRequest {
+                    uri = "/forms/$NON_EXISTING_FORM_ID/submit"
+                    method = HttpMethod.Post
+                    addHeader("Content-Type", ContentType.Application.FormUrlEncoded.toString())
+                    setBody(FormDataContent(parametersOf("somekey", "somevalue")).formData.formUrlEncode())
+                }
+
+                req.requestHandled shouldBe true
+                req.response shouldHaveStatus HttpStatusCode.NotFound
+                req.response.content shouldBe "The form with the formId $NON_EXISTING_FORM_ID was not found"
+            }
+        }
+
         "submitting form data via POST should work" {
             withTestApplication({ run(testDi) }) {
                 val req = handleRequest {
-                    uri = "/forms/1/submit"
+                    uri = "/forms/$EXISTING_FORM_ID/submit"
                     method = HttpMethod.Post
                     addHeader("Content-Type", ContentType.Application.FormUrlEncoded.toString())
                     setBody(FormDataContent(parametersOf("somekey", "somevalue")).formData.formUrlEncode())
