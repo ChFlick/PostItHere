@@ -12,16 +12,18 @@ import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.string.shouldNotBeBlank
-import io.ktor.http.*
-import io.ktor.server.testing.*
-import io.ktor.util.*
+import io.ktor.http.ContentType
+import io.ktor.http.HttpMethod
+import io.ktor.http.HttpStatusCode
+import io.ktor.server.testing.setBody
+import io.ktor.server.testing.withTestApplication
+import io.ktor.util.KtorExperimentalAPI
 import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import org.bson.types.ObjectId
 import org.kodein.di.DI
 import org.kodein.di.bind
 import org.kodein.di.instance
@@ -55,7 +57,7 @@ class UsersControllerKtTest : DatabaseStringSpec() {
             bind<ConfigStore>() with singleton { configStore }
         }
 
-        userColl = client.getCollection<User>(USERS_COLLECTION)
+        userColl = client.getCollection(USERS_COLLECTION)
         runBlocking {
             userColl.insertOne(
                 User(

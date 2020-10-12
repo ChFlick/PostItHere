@@ -13,7 +13,7 @@ import security.JwtConfig
 
 class JwtSecurityTest : StringSpec({
     var testDi = DI {}
-    val userService = mockk<UserService>();
+    val userService = mockk<UserService>()
 
     beforeEach {
         val jwtConfig = JwtConfig(testConfig)

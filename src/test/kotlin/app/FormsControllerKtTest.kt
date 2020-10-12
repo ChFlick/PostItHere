@@ -35,11 +35,13 @@ import java.time.ZonedDateTime
 @KtorExperimentalAPI
 @ExperimentalSerializationApi
 class FormsControllerKtTest : DatabaseStringSpec() {
+    companion object {
+        private const val EXISTING_FORM_ID = "1"
+        private const val NON_EXISTING_FORM_ID = "nonexisting"
+    }
+
     private val jwtConfig = JwtConfig(testConfig)
     private var testDi: DI = DI {}
-
-    private val EXISTING_FORM_ID = "1"
-    private val NON_EXISTING_FORM_ID = "nonexisting"
 
     override fun beforeEach(testCase: TestCase) {
         super.beforeEach(testCase)
@@ -74,7 +76,7 @@ class FormsControllerKtTest : DatabaseStringSpec() {
         "Fetching submitted form data should fail without auth" {
             withTestApplication({ run(testDi) }) {
                 val req = handleRequest {
-                    uri = "/forms/$EXISTING_FORM_ID"
+                    uri = "/forms/${EXISTING_FORM_ID}"
                 }
 
                 req.requestHandled shouldBe true
@@ -86,7 +88,7 @@ class FormsControllerKtTest : DatabaseStringSpec() {
         "Fetching submitted form data without forms should return an empty list" {
             withTestApplication({ run(testDi) }) {
                 val req = handleRequest {
-                    uri = "/forms/$EXISTING_FORM_ID"
+                    uri = "/forms/${EXISTING_FORM_ID}"
                     addJwtHeader()
                 }
 
@@ -123,7 +125,7 @@ class FormsControllerKtTest : DatabaseStringSpec() {
                 }
 
                 val req = handleRequest {
-                    uri = "/forms/$EXISTING_FORM_ID"
+                    uri = "/forms/${EXISTING_FORM_ID}"
                     addJwtHeader()
                 }
 
@@ -136,7 +138,7 @@ class FormsControllerKtTest : DatabaseStringSpec() {
         "submitting form data via GET should work" {
             withTestApplication({ run(testDi) }) {
                 val req = handleRequest {
-                    uri = "/forms/$EXISTING_FORM_ID/submit?somekey=somevalue"
+                    uri = "/forms/${EXISTING_FORM_ID}/submit?somekey=somevalue"
                 }
 
                 req.requestHandled shouldBe true
@@ -166,7 +168,7 @@ class FormsControllerKtTest : DatabaseStringSpec() {
         "submitting form data via POST should work" {
             withTestApplication({ run(testDi) }) {
                 val req = handleRequest {
-                    uri = "/forms/$EXISTING_FORM_ID/submit"
+                    uri = "/forms/${EXISTING_FORM_ID}/submit"
                     method = HttpMethod.Post
                     addHeader("Content-Type", ContentType.Application.FormUrlEncoded.toString())
                     setBody(FormDataContent(parametersOf("somekey", "somevalue")).formData.formUrlEncode())
