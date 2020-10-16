@@ -98,9 +98,8 @@ class MongoUserService(database: CoroutineDatabase) : UserService {
         return userCollection.findOneById(ObjectId(userId))
     }
 
-    override suspend fun getUserByCredentials(credential: EmailPasswordCredential): User? {
-        val user = userCollection.findOne(User::email eq credential.email) ?: return null
-        return if (BCrypt.checkpw(credential.password, user.password)) user else null
-    }
-
+    override suspend fun getUserByCredentials(credential: EmailPasswordCredential): User? =
+        userCollection.findOne(User::email eq credential.email)?.takeIf {
+            BCrypt.checkpw(credential.password, it.password)
+        }
 }
