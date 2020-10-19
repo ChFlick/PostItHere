@@ -17,6 +17,7 @@ plugins {
 
 scmVersion {
     tag.prefix = "v"
+    tag.versionSeparator = ""
 }
 
 group = "org.postithere"
